@@ -131,10 +131,10 @@ func (v *Validator) handle(ctx context.Context, log logr.Logger, op k8sadm.Opera
 		// check selector format
 		// If this is a selector change, and the new selector is not valid, we'll deny this operation
 		if err := validateSelectorChange(inst, oldInst); err != nil {
-			return webhooks.DenyBadRequest(fmt.Errorf("invalid Kubernetes labelSelector: %s", err))
+			return webhooks.DenyBadRequest(fmt.Errorf("invalid Kubernetes labelSelector: %w", err))
 		}
 		if err := validateTreeSelectorChange(inst, oldInst); err != nil {
-			return webhooks.DenyBadRequest(fmt.Errorf("invalid HNC %q value: %s", api.AnnotationTreeSelector, err))
+			return webhooks.DenyBadRequest(fmt.Errorf("invalid HNC %q value: %w", api.AnnotationTreeSelector, err))
 		}
 		if err := validateNoneSelectorChange(inst, oldInst); err != nil {
 			return webhooks.DenyBadRequest(err)
