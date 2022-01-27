@@ -268,7 +268,6 @@ func (v *Validator) decodeRequest(log logr.Logger, in admission.Request) (*nsReq
 		err = v.decoder.Decode(in, ns)
 	}
 	if err != nil {
-		log.Error(err, "Couldn't decode request")
 		return nil, apierrors.NewBadRequest(err.Error())
 	}
 
@@ -276,7 +275,6 @@ func (v *Validator) decodeRequest(log logr.Logger, in admission.Request) (*nsReq
 	if in.Operation == k8sadm.Update {
 		log.V(1).Info("Decoding an update request.")
 		if err = v.decoder.DecodeRaw(in.OldObject, oldns); err != nil {
-			log.Error(err, "Couldn't decode request")
 			return nil, apierrors.NewBadRequest(err.Error())
 		}
 	} else {

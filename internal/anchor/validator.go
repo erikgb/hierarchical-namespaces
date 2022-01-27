@@ -54,6 +54,7 @@ func (v *Validator) Handle(ctx context.Context, req admission.Request) admission
 
 	decoded, err := v.decodeRequest(log, req)
 	if err != nil {
+		log.Error(err, "Couldn't decode request")
 		return webhooks.DenyFromAPIError(err)
 	}
 
@@ -142,7 +143,6 @@ func (v *Validator) decodeRequest(log logr.Logger, in admission.Request) (*ancho
 		err = v.decoder.Decode(in, anchor)
 	}
 	if err != nil {
-		log.Error(err, "Couldn't decode request")
 		return nil, apierrors.NewBadRequest(err.Error())
 	}
 
