@@ -89,10 +89,9 @@ type request struct {
 // Authz false positives are prevented as described by the comments to `getServerChecks`.
 func (v *Validator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	log := v.Log.WithValues("ns", req.Namespace, "op", req.Operation, "user", req.UserInfo.Username)
-	decoded, err := v.decodeRequest(req)
+	decoded, err := v.decodeRequest(log, req)
 	if err != nil {
-		log.Error(err, "Couldn't decode request")
-		return webhooks.Deny(metav1.StatusReasonBadRequest, err.Error())
+		return webhooks.DenyFromAPIError(err)
 	}
 
 	resp := v.handle(ctx, log, decoded)
@@ -431,11 +430,12 @@ func (v *Validator) checkServer(ctx context.Context, log logr.Logger, ui *authnv
 
 // decodeRequest gets the information we care about into a simple struct that's easy to both a) use
 // and b) factor out in unit tests.
-func (v *Validator) decodeRequest(in admission.Request) (*request, error) {
+func (v *Validator) decodeRequest(log logr.Logger, in admission.Request) (*request, *errors.StatusError) {
 	hc := &api.HierarchyConfiguration{}
 	err := v.decoder.Decode(in, hc)
 	if err != nil {
-		return nil, err
+		log.Error(err, "Couldn't decode request")
+		return nil, apierrors.NewBadRequest(err.Error())
 	}
 
 	return &request{
