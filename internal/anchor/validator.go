@@ -55,7 +55,7 @@ func (v *Validator) Handle(ctx context.Context, req admission.Request) admission
 	decoded, err := v.decodeRequest(log, req)
 	if err != nil {
 		log.Error(err, "Couldn't decode request")
-		return webhooks.DenyFromAPIError(err)
+		return webhooks.DenyFromAPIError(apierrors.NewBadRequest(err.Error()))
 	}
 
 	resp := v.handle(decoded)
@@ -131,7 +131,7 @@ func (v *Validator) handle(req *anchorRequest) admission.Response {
 
 // decodeRequest gets the information we care about into a simple struct that's easy to both a) use
 // and b) factor out in unit tests.
-func (v *Validator) decodeRequest(log logr.Logger, in admission.Request) (*anchorRequest, *apierrors.StatusError) {
+func (v *Validator) decodeRequest(log logr.Logger, in admission.Request) (*anchorRequest, error) {
 	anchor := &api.SubnamespaceAnchor{}
 	var err error
 	// For DELETE request, use DecodeRaw() from req.OldObject, since Decode() only uses req.Object,
@@ -143,7 +143,7 @@ func (v *Validator) decodeRequest(log logr.Logger, in admission.Request) (*ancho
 		err = v.decoder.Decode(in, anchor)
 	}
 	if err != nil {
-		return nil, apierrors.NewBadRequest(err.Error())
+		return nil, err
 	}
 
 	return &anchorRequest{

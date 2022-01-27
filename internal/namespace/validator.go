@@ -54,7 +54,7 @@ func (v *Validator) Handle(ctx context.Context, req admission.Request) admission
 	decoded, err := v.decodeRequest(log, req)
 	if err != nil {
 		log.Error(err, "Couldn't decode request")
-		return webhooks.DenyFromAPIError(err)
+		return webhooks.DenyFromAPIError(apierrors.NewBadRequest(err.Error()))
 	}
 
 	resp := v.handle(decoded)
@@ -254,7 +254,7 @@ func (v *Validator) illegalCascadingDeletion(ns *forest.Namespace) admission.Res
 // easy to both a) use and b) factor out in unit tests. For Create and Delete,
 // the non-empty namespace instance will be put in the `ns` field. Only Update
 // request would have a non-empty `oldns` field.
-func (v *Validator) decodeRequest(log logr.Logger, in admission.Request) (*nsRequest, *apierrors.StatusError) {
+func (v *Validator) decodeRequest(log logr.Logger, in admission.Request) (*nsRequest, error) {
 	ns := &corev1.Namespace{}
 	oldns := &corev1.Namespace{}
 	var err error
@@ -268,14 +268,14 @@ func (v *Validator) decodeRequest(log logr.Logger, in admission.Request) (*nsReq
 		err = v.decoder.Decode(in, ns)
 	}
 	if err != nil {
-		return nil, apierrors.NewBadRequest(err.Error())
+		return nil, err
 	}
 
 	// Get the old namespace instance from an Update request.
 	if in.Operation == k8sadm.Update {
 		log.V(1).Info("Decoding an update request.")
 		if err = v.decoder.DecodeRaw(in.OldObject, oldns); err != nil {
-			return nil, apierrors.NewBadRequest(err.Error())
+			return nil, err
 		}
 	} else {
 		oldns = nil

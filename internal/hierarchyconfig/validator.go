@@ -92,7 +92,7 @@ func (v *Validator) Handle(ctx context.Context, req admission.Request) admission
 	decoded, err := v.decodeRequest(req)
 	if err != nil {
 		log.Error(err, "Couldn't decode request")
-		return webhooks.DenyFromAPIError(err)
+		return webhooks.DenyFromAPIError(apierrors.NewBadRequest(err.Error()))
 	}
 
 	resp := v.handle(ctx, log, decoded)
@@ -431,11 +431,11 @@ func (v *Validator) checkServer(ctx context.Context, log logr.Logger, ui *authnv
 
 // decodeRequest gets the information we care about into a simple struct that's easy to both a) use
 // and b) factor out in unit tests.
-func (v *Validator) decodeRequest(in admission.Request) (*request, *apierrors.StatusError) {
+func (v *Validator) decodeRequest(in admission.Request) (*request, error) {
 	hc := &api.HierarchyConfiguration{}
 	err := v.decoder.Decode(in, hc)
 	if err != nil {
-		return nil, apierrors.NewBadRequest(err.Error())
+		return nil, err
 	}
 
 	return &request{
