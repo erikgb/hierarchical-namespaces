@@ -68,6 +68,10 @@ func DenyBadRequest(err error) admission.Response {
 	return DenyFromAPIError(apierrors.NewBadRequest(err.Error()))
 }
 
+func DenyInternalError(err error) admission.Response {
+	return DenyFromAPIError(apierrors.NewInternalError(err))
+}
+
 // DenyFromAPIError returns a response for denying a request with provided status error object.
 func DenyFromAPIError(apiStatus apierrors.APIStatus) admission.Response {
 	status := apiStatus.Status()

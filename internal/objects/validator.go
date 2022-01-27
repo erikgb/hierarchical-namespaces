@@ -255,7 +255,7 @@ func (v *Validator) handleInherited(ctx context.Context, op k8sadm.Operation, ne
 		// namespace should be deleted, then don't block anything!
 		isDeleting, err := v.isDeletingNS(ctx, oldInst.GetNamespace())
 		if err != nil {
-			return webhooks.Deny(metav1.StatusReasonInternalError, "Cannot delete object propagated from namespace \""+oldSource+"\" with error: "+err.Error())
+			return webhooks.DenyInternalError(fmt.Errorf("cannot delete object propagated from namespace %s with error: %w", oldSource, err))
 		}
 
 		if !isDeleting {
@@ -291,7 +291,7 @@ func (v *Validator) handleInherited(ctx context.Context, op k8sadm.Operation, ne
 
 	// If you get here, it means the webhook config is misconfigured to include an operation that we
 	// actually don't support.
-	return webhooks.Deny(metav1.StatusReasonInternalError, "unknown operation: "+string(op))
+	return webhooks.DenyInternalError(fmt.Errorf("unknown operation: %s", op))
 }
 
 // validateDeletingNS validates if the namespace of the object is already being deleted
