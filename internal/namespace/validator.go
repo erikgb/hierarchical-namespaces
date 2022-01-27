@@ -8,11 +8,12 @@ import (
 	"github.com/go-logr/logr"
 	k8sadm "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-	"sigs.k8s.io/hierarchical-namespaces/internal/config"
 
 	api "sigs.k8s.io/hierarchical-namespaces/api/v1alpha2"
+	"sigs.k8s.io/hierarchical-namespaces/internal/config"
 	"sigs.k8s.io/hierarchical-namespaces/internal/forest"
 	"sigs.k8s.io/hierarchical-namespaces/internal/webhooks"
 )
@@ -53,11 +54,7 @@ func (v *Validator) Handle(ctx context.Context, req admission.Request) admission
 	decoded, err := v.decodeRequest(log, req)
 	if err != nil {
 		log.Error(err, "Couldn't decode request")
-		return webhooks.Deny(metav1.StatusReasonBadRequest, err.Error())
-	}
-	if decoded == nil {
-		// https://github.com/kubernetes-sigs/hierarchical-namespaces/issues/688
-		return webhooks.Allow("")
+		return webhooks.DenyFromAPIError(err)
 	}
 
 	resp := v.handle(decoded)
@@ -257,13 +254,13 @@ func (v *Validator) illegalCascadingDeletion(ns *forest.Namespace) admission.Res
 // easy to both a) use and b) factor out in unit tests. For Create and Delete,
 // the non-empty namespace instance will be put in the `ns` field. Only Update
 // request would have a non-empty `oldns` field.
-func (v *Validator) decodeRequest(log logr.Logger, in admission.Request) (*nsRequest, error) {
+func (v *Validator) decodeRequest(log logr.Logger, in admission.Request) (*nsRequest, *apierrors.StatusError) {
 	ns := &corev1.Namespace{}
 	oldns := &corev1.Namespace{}
 	var err error
 
-	// For DELETE request, use DecodeRaw() from req.OldObject, since Decode() only
-	// uses req.Object, which will be empty for a DELETE request.
+	// For DELETE request, use DecodeRaw() from req.OldObject, since Decode() only uses req.Object,
+	// which will be empty for a DELETE request.
 	if in.Operation == k8sadm.Delete {
 		log.V(1).Info("Decoding a delete request.")
 		err = v.decoder.DecodeRaw(in.OldObject, ns)
@@ -271,14 +268,16 @@ func (v *Validator) decodeRequest(log logr.Logger, in admission.Request) (*nsReq
 		err = v.decoder.Decode(in, ns)
 	}
 	if err != nil {
-		return nil, err
+		log.Error(err, "Couldn't decode request")
+		return nil, apierrors.NewBadRequest(err.Error())
 	}
 
 	// Get the old namespace instance from an Update request.
 	if in.Operation == k8sadm.Update {
 		log.V(1).Info("Decoding an update request.")
 		if err = v.decoder.DecodeRaw(in.OldObject, oldns); err != nil {
-			return nil, err
+			log.Error(err, "Couldn't decode request")
+			return nil, apierrors.NewBadRequest(err.Error())
 		}
 	} else {
 		oldns = nil
