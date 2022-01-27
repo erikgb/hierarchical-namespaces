@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"net/http"
 	"sigs.k8s.io/hierarchical-namespaces/internal/webhooks"
 
 	"github.com/go-logr/logr"
@@ -45,7 +44,7 @@ func (m *Mutator) Handle(ctx context.Context, req admission.Request) admission.R
 	m.handle(log, ns)
 	marshaledNS, err := json.Marshal(ns)
 	if err != nil {
-		return admission.Errored(http.StatusInternalServerError, err)
+		return webhooks.DenyFromAPIError(apierrors.NewInternalError(err))
 	}
 	return admission.PatchResponseFromRaw(req.Object.Raw, marshaledNS)
 }
