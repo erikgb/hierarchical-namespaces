@@ -54,12 +54,7 @@ func (v *Validator) Handle(ctx context.Context, req admission.Request) admission
 
 	decoded, err := v.decodeRequest(log, req)
 	if err != nil {
-		log.Error(err, "Couldn't decode request")
-		return webhooks.Deny(metav1.StatusReasonBadRequest, err.Error())
-	}
-	if decoded == nil {
-		// https://github.com/kubernetes-sigs/hierarchical-namespaces/issues/688
-		return webhooks.Allow("")
+		return webhooks.DenyFromAPIError(err)
 	}
 
 	resp := v.handle(decoded)
@@ -135,23 +130,20 @@ func (v *Validator) handle(req *anchorRequest) admission.Response {
 
 // decodeRequest gets the information we care about into a simple struct that's easy to both a) use
 // and b) factor out in unit tests.
-func (v *Validator) decodeRequest(log logr.Logger, in admission.Request) (*anchorRequest, error) {
+func (v *Validator) decodeRequest(log logr.Logger, in admission.Request) (*anchorRequest, *apierrors.StatusError) {
 	anchor := &api.SubnamespaceAnchor{}
 	var err error
 	// For DELETE request, use DecodeRaw() from req.OldObject, since Decode() only uses req.Object,
 	// which will be empty for a DELETE request.
 	if in.Operation == k8sadm.Delete {
 		log.V(1).Info("Decoding a delete request.")
-		if in.OldObject.Raw == nil {
-			// https://github.com/kubernetes-sigs/hierarchical-namespaces/issues/688
-			return nil, nil
-		}
 		err = v.decoder.DecodeRaw(in.OldObject, anchor)
 	} else {
 		err = v.decoder.Decode(in, anchor)
 	}
 	if err != nil {
-		return nil, err
+		log.Error(err, "Couldn't decode request")
+		return nil, apierrors.NewBadRequest(err.Error())
 	}
 
 	return &anchorRequest{
