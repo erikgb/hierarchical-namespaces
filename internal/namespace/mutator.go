@@ -3,15 +3,15 @@ package namespaces
 import (
 	"context"
 	"encoding/json"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"sigs.k8s.io/hierarchical-namespaces/internal/webhooks"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	api "sigs.k8s.io/hierarchical-namespaces/api/v1alpha2"
 	"sigs.k8s.io/hierarchical-namespaces/internal/config"
+	"sigs.k8s.io/hierarchical-namespaces/internal/webhooks"
 )
 
 const (
