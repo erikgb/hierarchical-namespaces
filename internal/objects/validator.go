@@ -92,7 +92,7 @@ func (v *Validator) Handle(ctx context.Context, req admission.Request) admission
 		}
 		if err := v.decoder.DecodeRaw(req.OldObject, oldInst); err != nil {
 			log.Error(err, "Couldn't decode req.OldObject", "raw", req.OldObject)
-			return webhooks.Deny(metav1.StatusReasonBadRequest, err.Error())
+			return webhooks.DenyFromAPIError(apierrors.NewBadRequest(err.Error()))
 		}
 	}
 
@@ -126,23 +126,23 @@ func (v *Validator) handle(ctx context.Context, log logr.Logger, op k8sadm.Opera
 	if !oldInherited && !newInherited {
 		// check if there is any invalid HNC annotation
 		if msg := validateSelectorAnnot(inst); msg != "" {
-			return webhooks.Deny(metav1.StatusReasonBadRequest, msg)
+			return webhooks.DenyFromAPIError(apierrors.NewBadRequest(msg))
 		}
 		// check selector format
 		// If this is a selector change, and the new selector is not valid, we'll deny this operation
 		if err := validateSelectorChange(inst, oldInst); err != nil {
 			msg := fmt.Sprintf("Invalid Kubernetes labelSelector: %s", err)
-			return webhooks.Deny(metav1.StatusReasonBadRequest, msg)
+			return webhooks.DenyFromAPIError(apierrors.NewBadRequest(msg))
 		}
 		if err := validateTreeSelectorChange(inst, oldInst); err != nil {
 			msg := fmt.Sprintf("Invalid HNC %q value: %s", api.AnnotationTreeSelector, err)
-			return webhooks.Deny(metav1.StatusReasonBadRequest, msg)
+			return webhooks.DenyFromAPIError(apierrors.NewBadRequest(msg))
 		}
 		if err := validateNoneSelectorChange(inst, oldInst); err != nil {
-			return webhooks.Deny(metav1.StatusReasonBadRequest, err.Error())
+			return webhooks.DenyFromAPIError(apierrors.NewBadRequest(err.Error()))
 		}
 		if msg := validateSelectorUniqueness(inst, oldInst); msg != "" {
-			return webhooks.Deny(metav1.StatusReasonBadRequest, msg)
+			return webhooks.DenyFromAPIError(apierrors.NewBadRequest(msg))
 		}
 
 		if yes, dnses := v.hasConflict(inst); yes {
