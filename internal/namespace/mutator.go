@@ -3,7 +3,9 @@ package namespaces
 import (
 	"context"
 	"encoding/json"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"net/http"
+	"sigs.k8s.io/hierarchical-namespaces/internal/webhooks"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -36,7 +38,8 @@ func (m *Mutator) Handle(ctx context.Context, req admission.Request) admission.R
 	ns := &corev1.Namespace{}
 	err := m.decoder.Decode(req, ns)
 	if err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
+		log.Error(err, "Couldn't decode request")
+		return webhooks.DenyFromAPIError(apierrors.NewBadRequest(err.Error()))
 	}
 
 	m.handle(log, ns)

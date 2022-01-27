@@ -10,6 +10,7 @@ import (
 	k8sadm "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -81,7 +82,7 @@ func (v *Validator) Handle(ctx context.Context, req admission.Request) admission
 	if req.Operation != k8sadm.Delete {
 		if err := v.decoder.Decode(req, inst); err != nil {
 			log.Error(err, "Couldn't decode req.Object", "raw", req.Object)
-			return webhooks.Deny(metav1.StatusReasonBadRequest, err.Error())
+			return webhooks.DenyFromAPIError(apierrors.NewBadRequest(err.Error()))
 		}
 	}
 	if req.Operation != k8sadm.Create {
