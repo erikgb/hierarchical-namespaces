@@ -64,6 +64,10 @@ func Deny(reason metav1.StatusReason, msg string) admission.Response {
 	return DenyFromAPIError(err)
 }
 
+func DenyBadRequest(err error) admission.Response {
+	return DenyFromAPIError(apierrors.NewBadRequest(err.Error()))
+}
+
 // DenyFromAPIError returns a response for denying a request with provided status error object.
 func DenyFromAPIError(apiStatus apierrors.APIStatus) admission.Response {
 	status := apiStatus.Status()

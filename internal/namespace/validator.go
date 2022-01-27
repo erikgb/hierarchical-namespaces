@@ -8,7 +8,6 @@ import (
 	"github.com/go-logr/logr"
 	k8sadm "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -54,7 +53,7 @@ func (v *Validator) Handle(ctx context.Context, req admission.Request) admission
 	decoded, err := v.decodeRequest(log, req)
 	if err != nil {
 		log.Error(err, "Couldn't decode request")
-		return webhooks.DenyFromAPIError(apierrors.NewBadRequest(err.Error()))
+		return webhooks.DenyBadRequest(err)
 	}
 
 	resp := v.handle(decoded)

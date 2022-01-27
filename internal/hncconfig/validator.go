@@ -69,7 +69,7 @@ func (v *Validator) Handle(ctx context.Context, req admission.Request) admission
 	inst := &api.HNCConfiguration{}
 	if err := v.decoder.Decode(req, inst); err != nil {
 		log.Error(err, "Couldn't decode request")
-		return webhooks.DenyFromAPIError(apierrors.NewBadRequest(err.Error()))
+		return webhooks.DenyBadRequest(err)
 	}
 
 	resp := v.handle(ctx, inst)

@@ -2,6 +2,7 @@ package objects
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -9,7 +10,6 @@ import (
 	"github.com/go-logr/logr"
 	k8sadm "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -82,7 +82,7 @@ func (v *Validator) Handle(ctx context.Context, req admission.Request) admission
 	if req.Operation != k8sadm.Delete {
 		if err := v.decoder.Decode(req, inst); err != nil {
 			log.Error(err, "Couldn't decode req.Object", "raw", req.Object)
-			return webhooks.DenyFromAPIError(apierrors.NewBadRequest(err.Error()))
+			return webhooks.DenyBadRequest(err)
 		}
 	}
 	if req.Operation != k8sadm.Create {
@@ -92,7 +92,7 @@ func (v *Validator) Handle(ctx context.Context, req admission.Request) admission
 		}
 		if err := v.decoder.DecodeRaw(req.OldObject, oldInst); err != nil {
 			log.Error(err, "Couldn't decode req.OldObject", "raw", req.OldObject)
-			return webhooks.DenyFromAPIError(apierrors.NewBadRequest(err.Error()))
+			return webhooks.DenyBadRequest(err)
 		}
 	}
 
@@ -126,23 +126,21 @@ func (v *Validator) handle(ctx context.Context, log logr.Logger, op k8sadm.Opera
 	if !oldInherited && !newInherited {
 		// check if there is any invalid HNC annotation
 		if msg := validateSelectorAnnot(inst); msg != "" {
-			return webhooks.DenyFromAPIError(apierrors.NewBadRequest(msg))
+			return webhooks.DenyBadRequest(errors.New(msg))
 		}
 		// check selector format
 		// If this is a selector change, and the new selector is not valid, we'll deny this operation
 		if err := validateSelectorChange(inst, oldInst); err != nil {
-			msg := fmt.Sprintf("Invalid Kubernetes labelSelector: %s", err)
-			return webhooks.DenyFromAPIError(apierrors.NewBadRequest(msg))
+			return webhooks.DenyBadRequest(fmt.Errorf("invalid Kubernetes labelSelector: %s", err))
 		}
 		if err := validateTreeSelectorChange(inst, oldInst); err != nil {
-			msg := fmt.Sprintf("Invalid HNC %q value: %s", api.AnnotationTreeSelector, err)
-			return webhooks.DenyFromAPIError(apierrors.NewBadRequest(msg))
+			return webhooks.DenyBadRequest(fmt.Errorf("invalid HNC %q value: %s", api.AnnotationTreeSelector, err))
 		}
 		if err := validateNoneSelectorChange(inst, oldInst); err != nil {
-			return webhooks.DenyFromAPIError(apierrors.NewBadRequest(err.Error()))
+			return webhooks.DenyBadRequest(err)
 		}
 		if msg := validateSelectorUniqueness(inst, oldInst); msg != "" {
-			return webhooks.DenyFromAPIError(apierrors.NewBadRequest(msg))
+			return webhooks.DenyBadRequest(errors.New(msg))
 		}
 
 		if yes, dnses := v.hasConflict(inst); yes {
@@ -303,7 +301,7 @@ func (v *Validator) isDeletingNS(ctx context.Context, ns string) (bool, error) {
 	if err := v.client.Get(ctx, nnm, nsObj); err != nil {
 		// `IsNotFound` should never happen, but if for some bizarre reason the namespace appears to be deleted before the object,
 		// we should allow the object to be deleted too.
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		return false, fmt.Errorf("while determining whether namespace %q is being deleted: %w", ns, err)
