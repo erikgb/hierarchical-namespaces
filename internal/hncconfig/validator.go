@@ -2,6 +2,7 @@ package hncconfig
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -56,7 +57,9 @@ func (v *Validator) Handle(ctx context.Context, req admission.Request) admission
 
 	if req.Operation == k8sadm.Delete {
 		if req.Name == api.HNCConfigSingleton {
-			return webhooks.Deny(metav1.StatusReasonForbidden, "Deleting the 'config' object is forbidden")
+			err := errors.New("deleting the 'config' object is forbidden")
+			// TODO(erikgb): MethodNotSupported error better?
+			return webhooks.DenyForbidden(api.HNCConfigurationGVR.GroupResource(), api.HNCConfigSingleton, err)
 		} else {
 			// We allow deleting other objects. We should never enter this case with the CRD validation. We introduced
 			// the CRD validation in v0.6. Before that, it was protected by the validation controller. If users somehow

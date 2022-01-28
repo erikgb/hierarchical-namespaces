@@ -123,12 +123,14 @@ func (v *Validator) handle(ctx context.Context, log logr.Logger, req *request) a
 	}
 
 	if why := config.WhyUnmanaged(req.hc.Namespace); why != "" {
-		reason := fmt.Sprintf("Namespace %q is not managed by HNC (%s) and cannot be set as a child of another namespace", req.hc.Namespace, why)
-		return webhooks.Deny(metav1.StatusReasonForbidden, reason)
+		err := fmt.Errorf("namespace %q is not managed by HNC (%s) and cannot be set as a child of another namespace", req.hc.Namespace, why)
+		// TODO(erikgb): Invalid field error better?
+		return webhooks.DenyForbidden(api.HierarchyConfigurationGVR.GroupResource(), api.Singleton, err)
 	}
 	if why := config.WhyUnmanaged(req.hc.Spec.Parent); why != "" {
-		reason := fmt.Sprintf("Namespace %q is not managed by HNC (%s) and cannot be set as the parent of another namespace", req.hc.Spec.Parent, why)
-		return webhooks.Deny(metav1.StatusReasonForbidden, reason)
+		err := fmt.Errorf("namespace %q is not managed by HNC (%s) and cannot be set as the parent of another namespace", req.hc.Spec.Parent, why)
+		// TODO(erikgb): Invalid field error better?
+		return webhooks.DenyForbidden(api.HierarchyConfigurationGVR.GroupResource(), api.Singleton, err)
 	}
 
 	allErrs := validateManagedMeta(req.hc)
@@ -188,8 +190,9 @@ func (v *Validator) checkNS(ns *forest.Namespace) admission.Response {
 	// may be trying to resolve the halted condition.
 	haltedRoot := ns.GetHaltedRoot()
 	if haltedRoot != "" && haltedRoot != ns.Name() {
-		msg := fmt.Sprintf("The ancestor %q of namespace %q has a critical condition, which must be resolved before any changes can be made to the hierarchy configuration.", haltedRoot, ns.Name())
-		return webhooks.Deny(metav1.StatusReasonForbidden, msg)
+		err := fmt.Errorf("ancestor %q of namespace %q has a critical condition, which must be resolved before any changes can be made to the hierarchy configuration", haltedRoot, ns.Name())
+		// TODO(erikgb): InternalError better?
+		return webhooks.DenyForbidden(api.HierarchyConfigurationGVR.GroupResource(), api.Singleton, err)
 	}
 
 	return allow("")
@@ -198,8 +201,9 @@ func (v *Validator) checkNS(ns *forest.Namespace) admission.Response {
 // checkParent validates if the parent is legal based on the current in-memory state of the forest.
 func (v *Validator) checkParent(ns, curParent, newParent *forest.Namespace) admission.Response {
 	if ns.IsExternal() && newParent != nil {
-		msg := fmt.Sprintf("Namespace %q is managed by %q, not HNC, so it cannot have a parent in HNC.", ns.Name(), ns.Manager)
-		return webhooks.Deny(metav1.StatusReasonForbidden, msg)
+		err := fmt.Errorf("namespace %q is managed by %q, not HNC, so it cannot have a parent in HNC", ns.Name(), ns.Manager)
+		// TODO(erikgb): Invalid field error better?
+		return webhooks.DenyForbidden(api.HierarchyConfigurationGVR.GroupResource(), api.Singleton, err)
 	}
 
 	if curParent == newParent {
@@ -214,7 +218,9 @@ func (v *Validator) checkParent(ns, curParent, newParent *forest.Namespace) admi
 
 	// non existence of parent namespace -> not allowed
 	if newParent != nil && !newParent.Exists() {
-		return webhooks.Deny(metav1.StatusReasonForbidden, "The requested parent "+newParent.Name()+" does not exist")
+		err := fmt.Errorf("requested parent %q does not exist", newParent.Name())
+		// TODO(erikgb): Invalid field error better?
+		return webhooks.DenyForbidden(api.HierarchyConfigurationGVR.GroupResource(), api.Singleton, err)
 	}
 
 	// Is this change structurally legal? Note that this can "leak" information about the hierarchy

@@ -9,7 +9,6 @@ import (
 	k8sadm "k8s.io/api/admission/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -86,8 +85,7 @@ func (v *Validator) handle(req *anchorRequest) admission.Response {
 			field.Invalid(fldPath, cnm, msg),
 		}
 
-		gk := schema.GroupKind{Group: api.GroupVersion.Group, Kind: "SubnamespaceAnchor"}
-		err := apierrors.NewInvalid(gk, cnm, allErrs)
+		err := apierrors.NewInvalid(api.SubnamespaceAnchorGVK.GroupKind(), cnm, allErrs)
 		return webhooks.DenyFromAPIError(err)
 	}
 
@@ -95,13 +93,15 @@ func (v *Validator) handle(req *anchorRequest) admission.Response {
 	case k8sadm.Create:
 		// Can't create subnamespaces in unmanaged namespaces
 		if why := config.WhyUnmanaged(pnm); why != "" {
-			msg := fmt.Sprintf("Cannot create a subnamespace in the unmanaged namespace %q (%s)", pnm, why)
-			return webhooks.Deny(metav1.StatusReasonForbidden, msg)
+			err := fmt.Errorf("cannot create a subnamespace in the unmanaged namespace %q (%s)", pnm, why)
+			// TODO(erikgb): Add to list of Invalid field errors?
+			return webhooks.DenyForbidden(api.SubnamespaceAnchorGVR.GroupResource(), pnm, err)
 		}
 		// Can't create subnamespaces using unmanaged namespace names
 		if why := config.WhyUnmanaged(cnm); why != "" {
-			msg := fmt.Sprintf("Cannot create a subnamespace using the unmanaged namespace name %q (%s)", cnm, why)
-			return webhooks.Deny(metav1.StatusReasonForbidden, msg)
+			err := fmt.Errorf("cannot create a subnamespace using the unmanaged namespace name %q (%s)", cnm, why)
+			// TODO(erikgb): Add to list of Invalid field errors?
+			return webhooks.DenyForbidden(api.SubnamespaceAnchorGVR.GroupResource(), cnm, err)
 		}
 
 		// Can't create anchors for existing namespaces, _unless_ it's for a subns with a missing
@@ -118,8 +118,8 @@ func (v *Validator) handle(req *anchorRequest) admission.Response {
 		// Don't allow the anchor to be deleted if it's in a good state and has descendants of its own,
 		// unless allowCascadingDeletion is set.
 		if req.anchor.Status.State == api.Ok && cns.ChildNames() != nil && !cns.AllowsCascadingDeletion() {
-			msg := fmt.Sprintf("The subnamespace %s is not a leaf and doesn't allow cascading deletion. Please set allowCascadingDeletion flag or make it a leaf first.", cnm)
-			return webhooks.Deny(metav1.StatusReasonForbidden, msg)
+			err := fmt.Errorf("subnamespace %s is not a leaf and doesn't allow cascading deletion. Please set allowCascadingDeletion flag or make it a leaf first", cnm)
+			return webhooks.DenyForbidden(api.SubnamespaceAnchorGVR.GroupResource(), cnm, err)
 		}
 
 	default:

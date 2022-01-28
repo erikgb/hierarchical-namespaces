@@ -32,4 +32,15 @@ var (
 
 	// AddToScheme adds the types in this group-version to the given scheme.
 	AddToScheme = SchemeBuilder.AddToScheme
+
+	HNCConfigurationGVR       = GroupVersion.WithResource("hncconfigurations")
+	HierarchyConfigurationGVR = GroupVersion.WithResource("hierarchyconfigurations")
+	HierarchyConfigurationGVK = GroupVersion.WithKind("HierarchyConfiguration")
+	SubnamespaceAnchorGVR     = GroupVersion.WithResource("subnamespaceanchors")
+	SubnamespaceAnchorGVK     = GroupVersion.WithKind("SubnamespaceAnchor")
 )
+
+// Resource takes an unqualified resource and returns a Group qualified GroupResource
+func Resource(resource string) schema.GroupResource {
+	return GroupVersion.WithResource(resource).GroupResource()
+}

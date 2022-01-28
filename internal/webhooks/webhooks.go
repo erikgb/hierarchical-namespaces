@@ -8,6 +8,7 @@ import (
 	authnv1 "k8s.io/api/authentication/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -70,6 +71,10 @@ func DenyBadRequest(err error) admission.Response {
 
 func DenyInternalError(err error) admission.Response {
 	return DenyFromAPIError(apierrors.NewInternalError(err))
+}
+
+func DenyForbidden(qualifiedResource schema.GroupResource, name string, err error) admission.Response {
+	return DenyFromAPIError(apierrors.NewForbidden(qualifiedResource, name, err))
 }
 
 // DenyFromAPIError returns a response for denying a request with provided status error object.
