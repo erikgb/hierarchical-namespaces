@@ -11,7 +11,7 @@ import (
 	authnv1 "k8s.io/api/authentication/v1"
 	authzv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -432,8 +432,7 @@ func (v *Validator) checkServer(ctx context.Context, log logr.Logger, ui *authnv
 // and b) factor out in unit tests.
 func (v *Validator) decodeRequest(in admission.Request) (*request, error) {
 	hc := &api.HierarchyConfiguration{}
-	err := v.decoder.Decode(in, hc)
-	if err != nil {
+	if err := v.decoder.Decode(in, hc); err != nil {
 		return nil, err
 	}
 
@@ -483,7 +482,7 @@ func (r *realClient) Exists(ctx context.Context, nnm string) (bool, error) {
 	nsn := types.NamespacedName{Name: nnm}
 	ns := &corev1.Namespace{}
 	if err := r.client.Get(ctx, nsn, ns); err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
 		return false, err

@@ -34,8 +34,7 @@ type Mutator struct {
 func (m *Mutator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	log := m.Log.WithValues("namespace", req.Name)
 	ns := &corev1.Namespace{}
-	err := m.decoder.Decode(req, ns)
-	if err != nil {
+	if err := m.decoder.Decode(req, ns); err != nil {
 		log.Error(err, "Couldn't decode request")
 		return webhooks.DenyBadRequest(err)
 	}
