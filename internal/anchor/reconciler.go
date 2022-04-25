@@ -92,9 +92,15 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// been bypassed and the anchor has been successfully created. Forbidden
 	// anchors won't have finalizers.
 	if why := config.WhyUnmanaged(nm); why != "" {
-		if inst.Status.State != api.Forbidden || controllerutil.ContainsFinalizer(inst, api.MetaGroup) {
+		if inst.Status.State != api.Forbidden {
 			log.Info("Setting forbidden state on anchor with unmanaged name", "reason", why)
 			inst.Status.State = api.Forbidden
+			if err := r.writeInstanceStatus(ctx, log, inst); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		if controllerutil.ContainsFinalizer(inst, api.MetaGroup) {
+			log.Info("Removing finalizers on anchor with unmanaged name", "reason", why)
 			controllerutil.RemoveFinalizer(inst, api.MetaGroup)
 			return ctrl.Result{}, r.writeInstance(ctx, log, inst)
 		}
@@ -115,9 +121,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		// Stop reconciliation as anchor is being deleted
 		return ctrl.Result{}, r.onDeleting(ctx, log, inst, snsInst)
 	}
-	// Add finalizers on all non-forbidden anchors to ensure it's not deleted until
-	// after the subnamespace is deleted.
-	controllerutil.AddFinalizer(inst, api.MetaGroup)
+	if !controllerutil.ContainsFinalizer(inst, api.MetaGroup) {
+		// Add finalizers on all non-forbidden anchors to ensure it's not deleted until
+		// after the subnamespace is deleted.
+		controllerutil.AddFinalizer(inst, api.MetaGroup)
+		if err := r.writeInstance(ctx, log, inst); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
 
 	// If the subnamespace doesn't exist, create it.
 	if inst.Status.State == api.Missing {
@@ -125,14 +136,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			// Write the "Missing" state to the anchor status if the subnamespace
 			// cannot be created for some reason. Without it, the anchor status will
 			// remain empty by default.
-			if anchorErr := r.writeInstance(ctx, log, inst); anchorErr != nil {
+			if anchorErr := r.writeInstanceStatus(ctx, log, inst); anchorErr != nil {
 				log.Error(anchorErr, "while setting anchor state", "state", api.Missing, "reason", err)
 			}
 			return ctrl.Result{}, err
 		}
 	}
 
-	return ctrl.Result{}, r.writeInstance(ctx, log, inst)
+	return ctrl.Result{}, r.writeInstanceStatus(ctx, log, inst)
 }
 
 // onDeleting returns true if the anchor is in the process of being deleted, and handles all
@@ -342,16 +353,17 @@ func (r *Reconciler) getInstance(ctx context.Context, pnm, nm string) (*api.Subn
 }
 
 func (r *Reconciler) writeInstance(ctx context.Context, log logr.Logger, inst *api.SubnamespaceAnchor) error {
-	if inst.CreationTimestamp.IsZero() {
-		if err := r.Create(ctx, inst); err != nil {
-			log.Error(err, "while creating on apiserver")
-			return err
-		}
-	} else {
-		if err := r.Update(ctx, inst); err != nil {
-			log.Error(err, "while updating on apiserver")
-			return err
-		}
+	if err := r.Update(ctx, inst); err != nil {
+		log.Error(err, "while updating on apiserver")
+		return err
+	}
+	return nil
+}
+
+func (r *Reconciler) writeInstanceStatus(ctx context.Context, log logr.Logger, inst *api.SubnamespaceAnchor) error {
+	if err := r.Status().Update(ctx, inst); err != nil {
+		log.Error(err, "while updating on apiserver")
+		return err
 	}
 	return nil
 }
